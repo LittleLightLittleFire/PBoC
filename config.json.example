@@ -1,4 +1,3 @@
 {
-    "weibo_app_key": "",
-    "weibo_app_secret": ""
+    "weibo_access_token": ""
 }
