@@ -1,3 +1,7 @@
 {
-    "weibo_access_token": ""
+    "weibo_access_token": "",
+    "twitter_consumer_key": "",
+    "twitter_consumer_secret": "",
+    "twitter_access_token": "",
+    "twitter_token_secret": ""
 }

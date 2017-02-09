@@ -9,6 +9,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/dghubble/go-twitter/twitter"
+	"github.com/dghubble/oauth1"
 	"github.com/hashicorp/errwrap"
 )
 
@@ -18,7 +20,11 @@ import (
 // We'll use our account as the feed, and just read our account.
 // The API does not allow us to read statuses of other users.
 type BotConfig struct {
-	WeiboAccessToken string `json:"weibo_access_token"`
+	WeiboAccessToken      string `json:"weibo_access_token"`
+	TwitterConsumerKey    string `json:"twitter_consumer_key"`
+	TwitterConsumerSecret string `json:"twitter_consumer_secret"`
+	TwitterAccessToken    string `json:"twitter_access_token"`
+	TwitterTokenSecret    string `json:"twitter_token_secret"`
 }
 
 var cfg BotConfig
@@ -29,6 +35,7 @@ type Status struct {
 		Name       string `json:"name"`
 		ScreenName string `json:"screen_name"`
 	} `json:"user"`
+	ID           int64  `json:"id"`
 	RawCreatedAt string `json:"created_at"`
 	Text         string `json:"text"`
 
@@ -67,14 +74,14 @@ func fetchJSON(url string, v interface{}) error {
 	return nil
 }
 
-func fetchStatus() ([]Status, error) {
+func fetchStatus(sinceID int64) ([]Status, error) {
 	var url = url.URL{
 		Scheme: "https",
 		Host:   "api.weibo.com",
 		Path:   "/2/statuses/home_timeline.json",
 		RawQuery: url.Values(map[string][]string{
 			"access_token": []string{cfg.WeiboAccessToken},
-			"since_id":     []string{"0"},
+			"since_id":     []string{fmt.Sprint(sinceID)},
 			"max_id":       []string{"0"},
 			"count":        []string{"100"},
 			"page":         []string{"1"},
@@ -112,30 +119,59 @@ func main() {
 		log.Fatal("Unable to load config:", err)
 	}
 
-	//bitcoin := "比特币" // bitcoin
-	//pboc := []string{
-	//"央行", // PBoC (short form),
-	//"中央", // CCCP
-	//}
-	//exchange := "交易"
+	// Login to Twitter
+	client := twitter.NewClient(oauth1.NewConfig(cfg.TwitterConsumerKey, cfg.TwitterConsumerSecret).Client(oauth1.NoContext, oauth1.NewToken(cfg.TwitterAccessToken, cfg.TwitterTokenSecret)))
+	user, _, err := client.Accounts.VerifyCredentials(nil)
+	if err != nil {
+		log.Fatal("Failed to verify Twitter credentials:", err)
+	}
+
+	log.Println("Logged in as:", user.Name)
+
+	// Fetch the initial status to get the ID
+	statuses, err := fetchStatus(0)
+	if err != nil {
+		log.Println("Error fetching weibo:", err)
+	}
+
+	var start int64
+	if len(statuses) > 0 {
+		start = statuses[0].ID
+	}
+	log.Println("Initial ID set:", start)
 
 	for {
-		// Wait for new updates
-		start := time.Now()
-		time.Sleep(30 * time.Second)
-
-		statuses, err := fetchStatus()
+		statuses, err = fetchStatus(start)
 		if err != nil {
 			log.Println("Error fetching weibo:", err)
 		}
+		log.Println("Loaded:", len(statuses), "updates")
 
 		for _, status := range statuses {
-			if status.CreatedAt.After(start) {
-				//if strings.Contains(status.Text, bitcoin) {
-				// Generate the tweet
-				log.Printf(fmt.Sprintf("%v: %v", status.User.Name, status.Text))
-				//}
+			// Report all bitcoin related statuses we'll get some false positives from translated sources but it is useful to test
+			//bitcoin := "比特币" // bitcoin
+
+			//if strings.Contains(status.Text, bitcoin) {
+			// Generate the tweet
+			runes := ([]rune)(fmt.Sprintf("%v: %v", status.User.Name, status.Text))
+			if len(runes) > 140 {
+				runes = []rune(string(runes[:140-4]) + " ...")
 			}
+
+			// Send the tweet
+			if tweet, _, err := client.Statuses.Update(string(runes), nil); err != nil {
+				log.Println("Failed to tweet:", status)
+			} else {
+				log.Printf("Sent tweet: %v: '%v'\n", tweet.IDStr, status)
+			}
+			//}
 		}
+
+		if len(statuses) > 0 {
+			start = statuses[0].ID
+			log.Println("Last ID:", start)
+		}
+
+		time.Sleep(30 * time.Second)
 	}
 }
