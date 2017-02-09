@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dghubble/go-twitter/twitter"
@@ -149,22 +150,22 @@ func main() {
 
 		for _, status := range statuses {
 			// Report all bitcoin related statuses we'll get some false positives from translated sources but it is useful to test
-			//bitcoin := "比特币" // bitcoin
+			bitcoin := "比特币" // bitcoin
 
-			//if strings.Contains(status.Text, bitcoin) {
-			// Generate the tweet
-			runes := ([]rune)(fmt.Sprintf("%v: %v", status.User.Name, status.Text))
-			if len(runes) > 140 {
-				runes = []rune(string(runes[:140-4]) + " ...")
-			}
+			if strings.Contains(status.Text, bitcoin) {
+				// Generate the tweet
+				runes := ([]rune)(fmt.Sprintf("%v: %v", status.User.Name, status.Text))
+				if len(runes) > 140 {
+					runes = []rune(string(runes[:140-4]) + " ...")
+				}
 
-			// Send the tweet
-			if tweet, _, err := client.Statuses.Update(string(runes), nil); err != nil {
-				log.Println("Failed to tweet:", status)
-			} else {
-				log.Printf("Sent tweet: %v: '%v'\n", tweet.IDStr, status)
+				// Send the tweet
+				if tweet, _, err := client.Statuses.Update(string(runes), nil); err != nil {
+					log.Println("Failed to tweet:", status)
+				} else {
+					log.Printf("Sent tweet: %v: '%v'\n", tweet.IDStr, status)
+				}
 			}
-			//}
 		}
 
 		if len(statuses) > 0 {
