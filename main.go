@@ -29,6 +29,9 @@ type BotConfig struct {
 }
 
 var cfg BotConfig
+var httpClient = http.Client{
+	Timeout: 10 * time.Second,
+}
 
 // Status defines a Weibo status.
 type Status struct {
@@ -62,7 +65,7 @@ func loadConfig() (config BotConfig, err error) {
 }
 
 func fetchJSON(url string, v interface{}) error {
-	resp, err := http.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		return errwrap.Wrapf("failed to GET: {{err}}", err)
 	}
