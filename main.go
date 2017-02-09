@@ -158,22 +158,35 @@ func main() {
 		}
 
 		for _, status := range statuses {
-			// Report all bitcoin related statuses we'll get some false positives from translated sources but it is useful to test
-			bitcoin := "比特币" // bitcoin
+			// Check the source of the status update
+			if strings.Contains(status.User.ScreenName, "火币网") ||
+				strings.Contains(status.User.ScreenName, "OKCoin") ||
+				strings.Contains(status.User.ScreenName, "YourBTCC") {
+				// If the source is an exchange, filter the fluff
 
-			if strings.Contains(status.Text, bitcoin) {
-				// Generate the tweet
-				runes := ([]rune)(fmt.Sprintf("%v: %v", status.User.Name, status.Text))
-				if len(runes) > 140 {
-					runes = []rune(string(runes[:140-4]) + " ...")
+				if !(strings.Contains(status.Text, "公告") || // Announcement
+					strings.Contains(status.Text, "尊敬") || // "Dear"
+					strings.Contains(status.Text, "用户")) { // "Customer"
+					continue
 				}
+			} else {
+				// News report, must contain the keyword bitcoin
+				if !strings.Contains(status.Text, "比特币") { // bitcoin
+					continue
+				}
+			}
 
-				// Send the tweet
-				if tweet, _, err := client.Statuses.Update(string(runes), nil); err != nil {
-					log.Println("Failed to tweet:", status)
-				} else {
-					log.Printf("Sent tweet: %v: '%v'\n", tweet.IDStr, status)
-				}
+			// Generate the tweet
+			runes := ([]rune)(fmt.Sprintf("%v: %v", status.User.Name, status.Text))
+			if len(runes) > 140 {
+				runes = []rune(string(runes[:140-4]) + " ...")
+			}
+
+			// Send the tweet
+			if tweet, _, err := client.Statuses.Update(string(runes), nil); err != nil {
+				log.Println("Failed to tweet:", status)
+			} else {
+				log.Printf("Sent tweet: %v: '%v'\n", tweet.IDStr, status)
 			}
 		}
 
