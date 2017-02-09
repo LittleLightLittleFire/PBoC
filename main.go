@@ -97,10 +97,15 @@ func fetchStatus(sinceID int64) ([]Status, error) {
 
 	var timeline struct {
 		Statuses []Status `json:"statuses"`
+		Error    string   `json:"error"`
 	}
 
 	if err := fetchJSON(url.String(), &timeline); err != nil {
 		return nil, errwrap.Wrapf("failed to fetch status: {{err}}", err)
+	}
+
+	if timeline.Error != "" {
+		return nil, fmt.Errorf("failed to fetch status: %v", timeline.Error)
 	}
 
 	// Convert the time on the status
@@ -148,6 +153,8 @@ func main() {
 		statuses, err = fetchStatus(start)
 		if err != nil {
 			log.Println("Error fetching weibo:", err)
+		} else {
+			log.Println("Loaded:", len(statuses), "statuses")
 		}
 
 		for _, status := range statuses {
@@ -175,6 +182,6 @@ func main() {
 			log.Println("Last ID:", start)
 		}
 
-		time.Sleep(30 * time.Second)
+		time.Sleep(3 * 60 * time.Second)
 	}
 }
