@@ -146,7 +146,6 @@ func main() {
 		if err != nil {
 			log.Println("Error fetching weibo:", err)
 		}
-		log.Println("Loaded:", len(statuses), "updates")
 
 		for _, status := range statuses {
 			// Report all bitcoin related statuses we'll get some false positives from translated sources but it is useful to test
