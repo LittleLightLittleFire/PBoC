@@ -137,6 +137,12 @@ func main() {
 
 	log.Println("Logged in as:", user.Name)
 
+	// Load China timezone so we can throttle our requests
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		log.Fatal("Failed to load CST time:", err)
+	}
+
 	// Fetch the initial status to get the ID
 	statuses, err := fetchStatus(0)
 	if err != nil {
@@ -195,6 +201,13 @@ func main() {
 			log.Println("Last ID:", start)
 		}
 
-		time.Sleep(3 * 60 * time.Second)
+		// Reduce fetch time during periods of low activity, Weibo's per day request quota is very low
+		// They keeps banning us: they allow ~470 requests a day
+		beijingTime := time.Now().In(loc)
+		if beijingTime.Hour() >= 7 && beijingTime.Hour() <= 19 { // 8:00 to 18:00 are the work hours
+			time.Sleep(3 * 60 * time.Second)
+		} else {
+			time.Sleep(5 * 60 * time.Second)
+		}
 	}
 }
