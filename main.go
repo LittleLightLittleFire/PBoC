@@ -21,11 +21,25 @@ import (
 // We'll use our account as the feed, and just read our account.
 // The API does not allow us to read statuses of other users.
 type BotConfig struct {
-	WeiboAccessToken      string `json:"weibo_access_token"`
+	// Multiple tokens to bypass API access limits
+	WeiboAccessTokens []string `json:"weibo_access_tokens"`
+
 	TwitterConsumerKey    string `json:"twitter_consumer_key"`
 	TwitterConsumerSecret string `json:"twitter_consumer_secret"`
 	TwitterAccessToken    string `json:"twitter_access_token"`
 	TwitterTokenSecret    string `json:"twitter_token_secret"`
+
+	// Used to rotate API keys to bypass Weibo's ridiculous query limit.
+	// If Weibo's reading this: learn to build a real webapp that actually scales
+	// instead of randomly banning API keys whenever it exceeds a "mystery number" of requests per day.
+	// I'm already using your recommended 3-5 min polling and it's still getting banned
+	// I'm not going to "verify my identity" just to build on your terrible joke of a platform.
+	// The fact you don't have an API to access another user's timeline is the biggest joke of them all.
+	//
+	// Due to the shortage of IPv4 space in China, they should expect multiple IPs accessing same API key.
+	// Everytime you throttle an API key I will add another one to the rotation until morale improves.
+	// /rant
+	rotation int
 }
 
 var cfg BotConfig
@@ -78,13 +92,18 @@ func fetchJSON(url string, v interface{}) error {
 	return nil
 }
 
-func fetchStatus(sinceID int64) ([]Status, error) {
+func fetchStatus(sinceID int64) (status []Status, err error) {
+	defer func() {
+		if err != nil {
+			cfg.rotation = (cfg.rotation + 1) % len(cfg.WeiboAccessTokens)
+		}
+	}()
 	var url = url.URL{
 		Scheme: "https",
 		Host:   "api.weibo.com",
 		Path:   "/2/statuses/home_timeline.json",
 		RawQuery: url.Values(map[string][]string{
-			"access_token": []string{cfg.WeiboAccessToken},
+			"access_token": []string{cfg.WeiboAccessTokens[cfg.rotation%len(cfg.WeiboAccessTokens)]},
 			"since_id":     []string{fmt.Sprint(sinceID)},
 			"max_id":       []string{"0"},
 			"count":        []string{"100"},
@@ -143,16 +162,23 @@ func main() {
 		log.Fatal("Failed to load CST time:", err)
 	}
 
+	var statuses []Status
+
 	// Fetch the initial status to get the ID
-	statuses, err := fetchStatus(0)
-	if err != nil {
-		log.Println("Error fetching weibo:", err)
+	for _ = range cfg.WeiboAccessTokens {
+		var err error
+		statuses, err = fetchStatus(0)
+		if err != nil {
+			log.Println("Error fetching initial weibo:", err, "retrying")
+		}
 	}
 
 	var start int64
-	if len(statuses) > 0 {
-		start = statuses[0].ID
+	if len(statuses) == 0 {
+		log.Fatal("Failed to fetch statuses")
 	}
+
+	start = statuses[0].ID
 	log.Println("Initial ID set:", start)
 
 	for {
