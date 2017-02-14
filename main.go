@@ -192,8 +192,8 @@ func main() {
 		for _, status := range statuses {
 			// Check the source of the status update
 			if strings.Contains(status.User.ScreenName, "火币网") ||
-				strings.Contains(status.User.ScreenName, "OKCoin") ||
-				strings.Contains(status.User.ScreenName, "YourBTCC") {
+				strings.Contains(status.User.ScreenName, "OKCoin比特币") ||
+				strings.Contains(status.User.ScreenName, "BTCChina比特币") {
 				// If the source is an exchange, filter the fluff
 
 				if !(strings.Contains(status.Text, "公告") || // Announcement
